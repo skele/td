@@ -4,9 +4,9 @@
 int main(int argc, char** argv)
 {
   FILE *fin,*fout;
-  int histo[100][40];
+  double histo[100][40];
   char line[100];
-  double time,lambda,baselambda;
+  double time,lambda,baselambda,strength;
   int timebin,lambdabin,i,j;
   int accept,dismissal;
 
@@ -20,17 +20,17 @@ int main(int argc, char** argv)
   
   for (i = 0; i < 100; i++)
     for (j = 0; j < 40; j++)
-      histo[i][j] = 0;
+      histo[i][j] = 0.0;
 
   while (fgets(line,100,fin) != NULL)
     {
-      sscanf(line, "%lf %lf\n",&time,&lambda);
+      sscanf(line, "%lf %lf %lf\n",&time,&lambda,&strength);
       //which time bin is it?
-      timebin = floor(time*10.0);
-      lambdabin = floor((lambda-baselambda)*10.0+20.0);//THINK HERE
+      timebin = floor(time/10.0);
+      lambdabin = floor((lambda-baselambda)*20.0+20.0);//THINK HERE
       if ((timebin >= 0) && (timebin < 100) && (lambdabin >= 0) && (lambdabin < 40))
 	{
-	  histo[timebin][lambdabin]++;
+	  histo[timebin][lambdabin] += strength;
 	  accept++;
 	}
       else
@@ -40,11 +40,11 @@ int main(int argc, char** argv)
     }
   for (i = 0; i < 100; i++)
     {
-      time = i*10.0;
+      time = i*100.0;
     for (j = 0; j < 40; j++)
       {
-	lambda = j+baselambda-20.0;
-	fprintf(fout,"%d\t%f\t%d\n",i,lambda,histo[i][j]);
+	lambda = (j-20.0)/20.0+baselambda;
+	fprintf(fout,"%d\t%f\t%f\n",i,lambda,histo[i][j]);
       }
     }
   printf("Accepted %d Dismissed %d\n",accept,dismissal);

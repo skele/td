@@ -6,7 +6,8 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 #include <stdio.h>
 #include <stdlib.h>
 
-#define VSCALE 613476.295 
+#define VSCALE 613476.295
+#define TIMEINDAYS 23286.24 
 
 void loopthroughgas(double* bhpos, double clight, double phi, double theta)
 {
@@ -15,7 +16,7 @@ void loopthroughgas(double* bhpos, double clight, double phi, double theta)
   FILE *f, *fout;
   char line[160];
   double tpos[3],tv[3];
-  double rotate[3],v;
+  double rotate[3],v,strength;
   baselambda = 656.0;
   f = fopen("gas.dat", "rt");
   fout = fopen("out.dat", "w");
@@ -34,9 +35,11 @@ void loopthroughgas(double* bhpos, double clight, double phi, double theta)
       rij_eye = rotate[0]*tpos[0]+rotate[1]*tpos[1]+rotate[2]*tpos[2];
       //also project velocity to the line of sight
       v = rotate[0]*tv[0]+rotate[1]*tv[1]+rotate[2]*tv[2];
-      time = (rij+rij_eye)/clight; //when the TD reaches the gas particle and then the radiation reaches the eye
+      time = (rij+rij_eye)/clight*TIMEINDAYS; //when the TD reaches the gas particle and then the radiation reaches the eye
       lambda = baselambda/(1.0-v/clight);
-      fprintf(fout,"%f\t%f\n",time,lambda);
+      strength = 1.0/(rij*rij);
+      //strength is because of the weaker TD impact over distance^2
+      fprintf(fout,"%f\t%f\t%f\n",time,lambda,strength);
     }
 
 }
