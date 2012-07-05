@@ -40,7 +40,6 @@ int main (int argc, char** argv)
 {
 
   double bhpos[3], clight;
-  //  gp** radial;
   bhpos[0] = 0.012866;
   bhpos[1] = 0.3103;
   bhpos[2] = -0.02399;
