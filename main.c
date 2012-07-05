@@ -6,31 +6,37 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 #include <stdio.h>
 #include <stdlib.h>
 
-struct gasparticle {
-  double x[3],v[3];
-  struct gasparticle * next;
-};
+#define VSCALE 613476.295 
 
-typedef struct gasparticle gp;
-
-void loopthroughgas(double* bhpos, double clight)
+void loopthroughgas(double* bhpos, double clight, double phi, double theta)
 {
-  int i,id;
-  double mass,rij,basefreq,freq,time;
+  int id;
+  double mass,rij,baselambda,lambda,time,rij_eye;
   FILE *f, *fout;
   char line[160];
   double tpos[3],tv[3];
-  basefreq = 1000.0;
+  double rotate[3],v;
+  baselambda = 656.0;
   f = fopen("gas.dat", "rt");
   fout = fopen("out.dat", "w");
+  //define rotation matrix; need only to obtain the final z component so only need last line of the matrix, e.g. a vector;
+  theta = theta/180.0*3.14159;
+  phi = phi/180.0*3.14159;
+  rotate[0] = sin(theta)*sin(phi);
+  rotate[1] = sin(theta)*cos(phi);
+  rotate[2] = cos(theta);
   while (fgets(line, 160, f) != NULL)
     {
       sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass,&tpos[0],&tpos[1],&tpos[2],&tv[0],&tv[1],&tv[2]);
       rij = sqrt((tpos[0]-bhpos[0])*(tpos[0]-bhpos[0])+(tpos[1]-bhpos[1])*(tpos[1]-bhpos[1])+(tpos[2]-bhpos[2])*(tpos[2]-bhpos[2]));
-      //first assumption: see everything instantly after lighting up. looking from left so only x-component of velocity makes doppler-shift.
-      time = rij/clight; //when the TD reaches the gas particle
-      freq = (1.0-tv[0]/clight)*basefreq;
-      fprintf(fout,"%f\t%f\n",time,freq);
+      //need also distance to the observer, who is located at the direction (phi,theta) in degrees
+      //rotation so that z points into observer direction (confirm definitions/notations.....)
+      rij_eye = rotate[0]*tpos[0]+rotate[1]*tpos[1]+rotate[2]*tpos[2];
+      //also project velocity to the line of sight
+      v = rotate[0]*tv[0]+rotate[1]*tv[1]+rotate[2]*tv[2];
+      time = (rij+rij_eye)/clight; //when the TD reaches the gas particle and then the radiation reaches the eye
+      lambda = baselambda/(1.0-v/clight);
+      fprintf(fout,"%f\t%f\n",time,lambda);
     }
 
 }
@@ -39,13 +45,15 @@ void loopthroughgas(double* bhpos, double clight)
 int main (int argc, char** argv)
 {
 
-  double bhpos[3], clight;
+  double bhpos[3], clight, phi, theta;
   bhpos[0] = 0.012866;
   bhpos[1] = 0.3103;
   bhpos[2] = -0.02399;
-  clight = 10.0;
+  clight = 3.0e8/VSCALE;
+  phi = 0.0;
+  theta = 45.0;
 
-  loopthroughgas(bhpos,clight);
+  loopthroughgas(bhpos,clight,phi,theta);
 
 
   return 0;

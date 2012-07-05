@@ -6,14 +6,14 @@ int main(int argc, char** argv)
   FILE *fin,*fout;
   int histo[100][40];
   char line[100];
-  double time,freq,basefreq;
-  int timebin,freqbin,i,j;
+  double time,lambda,baselambda;
+  int timebin,lambdabin,i,j;
   int accept,dismissal;
 
   accept=0;
   dismissal=0;
 
-  basefreq = 1000.0;
+  baselambda = 656.0;
 
   fin = fopen(argv[1],"r");
   fout = fopen(argv[2],"w");
@@ -24,13 +24,13 @@ int main(int argc, char** argv)
 
   while (fgets(line,100,fin) != NULL)
     {
-      sscanf(line, "%lf %lf\n",&time,&freq);
+      sscanf(line, "%lf %lf\n",&time,&lambda);
       //which time bin is it?
-      timebin = floor(time);
-      freqbin = floor((freq-basefreq)/10.0+20.0);
-      if ((timebin >= 0) && (timebin < 100) && (freqbin >= 0) && (freqbin < 40))
+      timebin = floor(time*10.0);
+      lambdabin = floor((lambda-baselambda)*10.0+20.0);//THINK HERE
+      if ((timebin >= 0) && (timebin < 100) && (lambdabin >= 0) && (lambdabin < 40))
 	{
-	  histo[timebin][freqbin]++;
+	  histo[timebin][lambdabin]++;
 	  accept++;
 	}
       else
@@ -43,8 +43,8 @@ int main(int argc, char** argv)
       time = i*10.0;
     for (j = 0; j < 40; j++)
       {
-	freq = j*10.0+basefreq-200.0;
-	fprintf(fout,"%d\t%f\t%d\n",i,freq,histo[i][j]);
+	lambda = j+baselambda-20.0;
+	fprintf(fout,"%d\t%f\t%d\n",i,lambda,histo[i][j]);
       }
     }
   printf("Accepted %d Dismissed %d\n",accept,dismissal);
