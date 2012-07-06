@@ -9,16 +9,16 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 #define VSCALE 613476.295
 #define TIMEINDAYS 23286.24 
 
-void loopthroughgas(double clight, double phi, double theta)
+void loopthroughgas(char* infile, double clight, double phi, double theta)
 {
   int id;
   double mass,rij,baselambda,lambda,time,rij_eye;
   FILE *f, *fout, *fout2;
   char line[160];
   double tpos[3],tv[3],bh1pos[3],bh1v[3],bh2pos[3],bh2v[3];
-  double rotate[3],v,strength;
+  double rotate[3],v,strength,lambda2,strength2,rij2,time2;
   baselambda = 656.0;
-  f = fopen("gas.dat", "rt");
+  f = fopen(infile, "rt");
   fout = fopen("out.dat", "w");
   fout2 = fopen("out2.dat", "w");
   //define rotation matrix; need only to obtain the final z component so only need last line of the matrix, e.g. a vector;
@@ -59,11 +59,13 @@ int main (int argc, char** argv)
 {
 
   double clight, phi, theta;
+  char* infile;
+  infile = (char*) malloc(50*sizeof(char));
   clight = 3.0e8/VSCALE;
   phi = 0.0;
   theta = 45.0;
-
-  loopthroughgas(bhpos,clight,phi,theta);
+  infile = argv[1];
+  loopthroughgas(infile,clight,phi,theta);
 
 
   return 0;
