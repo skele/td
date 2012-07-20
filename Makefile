@@ -1,4 +1,4 @@
-FLAGS= -lm -Wall
+FLAGS= -lm -Wall -g
 CC=gcc
 
 td: main.c

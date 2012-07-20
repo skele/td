@@ -11,7 +11,7 @@ do
 set terminal png
 set xlabel 'Wavelength (nm)'
 set ylabel 'Flux (something like flux)'
-set xrange [655:657]
+set xrange [655.3:657.3]
 set yrange [0:${max}]
 __EOF__
 
