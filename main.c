@@ -8,23 +8,23 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 
 #define XRES 200.0
 #define YRES 200.0
-#define ZRES 200.0
+#define ZRES 100.0
 
-#define XMIN (-10.0)
-#define XMAX 14.0
-#define YMIN (-9.0)
-#define YMAX 11.0
-#define ZMIN (-6.0)
+#define XMIN (-20.0)
+#define XMAX 20.0
+#define YMIN (-20.0)
+#define YMAX 20.0
+#define ZMIN (-10.0)
 #define ZMAX 10.0
 
-#define NT 10
-#define L_0 1
+#define NT 20
+#define L_0 1.0
 #define DURATION 300
 #define SRES 30
 #define SMIN 655.3
 #define SMAX 657.3
 
-#define OFFSET 10
+#define OFFSET 20
 //additional eye distance so that all the arrival times are > 0
 
 #define VSCALE 613476.295
@@ -146,10 +146,10 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
 	{
 	  if (dens[i][j][k] > 0.0)
 	    {
-	      //calculate 3d position of the cell, first make number between 0 and 1
-	      tpos[0] = i/((double) XRES)*(XMAX - XMIN) + XMIN;
-	      tpos[1] = j/((double) YRES)*(YMAX - YMIN) + YMIN;
-	      tpos[2] = k/((double) ZRES)*(ZMAX - ZMIN) + ZMIN;
+	      //calculate 3d position of the cell, first make number between 0 and 1 then also add the half length so that it is in the center of the cell
+	      tpos[0] = i/((double) XRES)*(XMAX - XMIN) + XMIN + (XMAX-XMIN)/XRES/2.0;
+	      tpos[1] = j/((double) YRES)*(YMAX - YMIN) + YMIN + (YMAX-YMIN)/YRES/2.0;
+	      tpos[2] = k/((double) ZRES)*(ZMAX - ZMIN) + ZMIN + (ZMAX-ZMIN)/ZRES/2.0;
 	      rij = sqrt((tpos[0]-bh1pos[0])*(tpos[0]-bh1pos[0])+(tpos[1]-bh1pos[1])*(tpos[1]-bh1pos[1])+(tpos[2]-bh1pos[2])*(tpos[2]-bh1pos[2]));
 	      rij2 = sqrt((tpos[0]-bh2pos[0])*(tpos[0]-bh2pos[0])+(tpos[1]-bh2pos[1])*(tpos[1]-bh2pos[1])+(tpos[2]-bh2pos[2])*(tpos[2]-bh2pos[2]));
 	      //printf("%f\t%f\n",rij,rij2);
@@ -183,9 +183,9 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
 		  ts1 = strength0_1*luminosity((double) l)*(dens[i][j][k]);//*(dens[i][j][k]);
 		  ts2 = strength0_2*ts1/strength0_1;
 		  //printf("%e\t%e\t%e\t%e\t%e\n",ts1,ts2,strength0_1,luminosity((double) l),dens[i][j][k]);
-		  if ((time0_1 + l) < DURATION)
+		  if (((time0_1 + l) < DURATION) && ((time0_1 + l) >= 0))
 		    spectrum[time0_1 + l][freqbin] += ts1;
-		  if ((time0_2 + l) < DURATION)
+		  if (((time0_2 + l) < DURATION) && ((time0_2 + l) >= 0))
 		    spectrum2[time0_2 + l][freqbin] += ts2;
 		}
 	    }
