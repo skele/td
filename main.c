@@ -30,6 +30,7 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 #define VSCALE 613476.295
 #define TIMEINDAYS 23286.24 
 
+#define TEMPCOEFF 0.000001
 
 void fillarrays(double ***dens, double ***velocity, char* infile, double phi, double theta)
 {
@@ -88,7 +89,7 @@ void fillarrays(double ***dens, double ***velocity, char* infile, double phi, do
 	    }
 	}
       }
-  //  printf("Accepted %d\tdiscarded %d\n",accept,discard);
+  printf("Boxed %2.2f%% of the particles\n",(double) accept*100.0/(accept+discard));
 }
 
 double luminosity(double time)
@@ -101,16 +102,16 @@ double luminosity(double time)
 void loopthroughgrid(double ***dens, double ***velocity, double clight, double phi, double theta, char* infile)
 {
   int id;
-  double mass,rij,baselambda,lambda,time,rij_eye;
+  double mass,rij,baselambda,lambda,dlambda1,dlambda2,time,rij_eye,temperature1,temperature2,base_ts1,base_ts2;
   FILE *f, *fout, *fout2;
   char line[160];
   double tpos[3],bh1pos[3],bh1v[3],bh2pos[3],bh2v[3];
-  double rotate[3],rij2,time2;
+  double rotate[3],rij2,time2,difflambda;
   baselambda = 656.3;
   int time0_1,time0_2,accepted,rejected;
-  int i,j,k,l,freqbin;
+  int i,j,k,l,ll,freqbin;
   double ts1,ts2,strength0_1,strength0_2;
-  double **spectrum,**spectrum2;
+  double **spectrum,**spectrum2,tcoeff1,tcoeff2;
   spectrum = (double **) malloc(DURATION * sizeof(double *));
   for (i = 0; i < DURATION; i++)
     spectrum[i] = (double *) malloc(SRES * sizeof(double));
@@ -152,7 +153,9 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
 	      tpos[2] = k/((double) ZRES)*(ZMAX - ZMIN) + ZMIN + (ZMAX-ZMIN)/ZRES/2.0;
 	      rij = sqrt((tpos[0]-bh1pos[0])*(tpos[0]-bh1pos[0])+(tpos[1]-bh1pos[1])*(tpos[1]-bh1pos[1])+(tpos[2]-bh1pos[2])*(tpos[2]-bh1pos[2]));
 	      rij2 = sqrt((tpos[0]-bh2pos[0])*(tpos[0]-bh2pos[0])+(tpos[1]-bh2pos[1])*(tpos[1]-bh2pos[1])+(tpos[2]-bh2pos[2])*(tpos[2]-bh2pos[2]));
-	      //printf("%f\t%f\n",rij,rij2);
+	      
+
+
 	      //already know the l.o.s. velocity
 	      //need also distance to the observer, who is located at the direction (phi,theta) in degrees
 	      //rotation so that z points into observer direction (confirm definitions/notations.....)
@@ -162,7 +165,15 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
 	      time2 = (rij2+rij_eye)/clight*TIMEINDAYS + OFFSET; //when the TD reaches the gas particle and then the radiation reaches the eye
 	      //	  printf("%f\t%f\n",time,time2);
 	      lambda = baselambda/(1.0-velocity[i][j][k]/clight);
+
+	      //rij2 will now also be used to assign a certain temperature for doppler broadening
+	      temperature1 = TEMPCOEFF/rij/rij;
+	      dlambda1 = lambda*sqrt(temperature1); // the broadening
+	      temperature2 = TEMPCOEFF/rij2/rij2;
+	      dlambda2 = lambda*sqrt(temperature2);// the broadening
+
 	      //find the time bin where the first entry belongs (t=0 TD emission)
+
 	      time0_1 = floor(time);
 	      time0_2 = floor(time2);
 	      //find the frequency bin
@@ -180,13 +191,26 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
 	      for (l = 0; l < NT; l++)
 		{
 		  //now calculate the flux for NT different times
-		  ts1 = strength0_1*luminosity((double) l)*(dens[i][j][k]);//*(dens[i][j][k]);
-		  ts2 = strength0_2*ts1/strength0_1;
-		  //printf("%e\t%e\t%e\t%e\t%e\n",ts1,ts2,strength0_1,luminosity((double) l),dens[i][j][k]);
-		  if (((time0_1 + l) < DURATION) && ((time0_1 + l) >= 0))
-		    spectrum[time0_1 + l][freqbin] += ts1;
-		  if (((time0_2 + l) < DURATION) && ((time0_2 + l) >= 0))
-		    spectrum2[time0_2 + l][freqbin] += ts2;
+		  base_ts1 = strength0_1*luminosity((double) l)*(dens[i][j][k]);//*(dens[i][j][k]);
+		  base_ts2 = strength0_2*ts1/strength0_1;
+
+		  //loop over whole frequency and calculate corresponding doppler broadened flux value
+		  for (ll = 0; ll < SRES; ll++)
+		    {
+		      //convert the difference in frequency bins into a difference in lambda
+		      difflambda = (freqbin-ll)/((float) SRES)*(SMAX - SMIN);
+		      tcoeff1 = 1.0/dlambda1*exp(-(difflambda*difflambda)/(dlambda1*dlambda1));
+		      tcoeff2 = 1.0/dlambda2*exp(-(difflambda*difflambda)/(dlambda2*dlambda2));
+		      ts1 = base_ts1*tcoeff1;
+		      ts2 = base_ts2*tcoeff2;
+		      // printf("diff lambda: %e strength coeff: %e temp: %e  dlambda: %e\n ",difflambda,tcoeff1,temperature1,dlambda1);
+		      if (((time0_1 + l) < DURATION) && ((time0_1 + l) >= 0))
+			spectrum[time0_1 + l][ll] += ts1;
+		      if (((time0_2 + l) < DURATION) && ((time0_2 + l) >= 0))
+			spectrum2[time0_2 + l][ll] += ts2;
+		      
+		      
+		    }
 		}
 	    }
 	}
@@ -198,7 +222,7 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
 	fprintf(fout,"%d\t%f\t%f\n",i,lambda,spectrum[i][j]);
 	fprintf(fout2,"%d\t%f\t%f\n",i,lambda,spectrum2[i][j]);
       }
-  printf("Accepted %d\tRejected %d\n",accepted,rejected);
+  printf("Accepted %2.2f%% of time and spectrum data\n",(double) accepted*100.0/(accepted+rejected));
 }
 
 
@@ -209,6 +233,13 @@ int main (int argc, char** argv)
   double clight, phi, theta;
   char *infile,*infileBH;
   int i,j,k;
+
+  if (argc != 3)
+    {
+      printf("Usage: \n");
+      printf("./td <inputfile_gas> <inputfile_BHs>\n");
+      return 0;
+    }
 
 
   infile = (char *) malloc(100*sizeof(char));
