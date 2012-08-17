@@ -17,14 +17,12 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 #define ZMIN (-10.0)
 #define ZMAX 10.0
 
-#define NT 50
-
+#define NT 20
+#define L_0 1.0
 #define DURATION 300
 #define SRES 30
 #define SMIN 655.3
 #define SMAX 657.3
-
-#define PI 3.14159
 
 #define OFFSET 20
 //additional eye distance so that all the arrival times are > 0
@@ -38,21 +36,11 @@ const double KG_SCALE = (1.99E+30*MSUN_SCALE);
 const double G_SI = (6.67E-11);
 //derive velocity scale
 
-const double TEMPCOEFF = 0.000000001;
+const double TEMPCOEFF = 0.000001;
 
 const double VSCALE = sqrt(G_SI*KG_SCALE/M_SCALE);
 const double TIMEINSECONDS = sqrt(M_SCALE*M_SCALE*M_SCALE/G_SI/KG_SCALE);
 const double TIMEINDAYS = TIMEINSECONDS/(24.0*3600.0);
-
-const double PROTONMASS = 1.67E-27 / KG_SCALE;
-
-//define ionization rate value in SI units
-
-const double I_0_SI = 3.8E+31;
-const double I_0 = I_0_SI/(M_SCALE*M_SCALE/TIMEINSECONDS);
-const double HV0 = 2.17E-11; //photon energy in erg
-
-const double DL = 3.1E+24;
 
 void fillarrays(double ***dens, double ***velocity, char* infile, double phi, double theta)
 {
@@ -106,8 +94,7 @@ void fillarrays(double ***dens, double ***velocity, char* infile, double phi, do
 	  if (dens[i][j][k] > 0.0)
 	    {
 	      velocity[i][j][k] /= dens[i][j][k];
-	      //dens[i][j][k] /= volume;
-	      //without the /= volume this is the absolute number of mass in a cell
+	      dens[i][j][k] /= volume;
 	      columndens += dens[i][j][k];
 	    }
 	}
@@ -115,34 +102,26 @@ void fillarrays(double ***dens, double ***velocity, char* infile, double phi, do
   printf("Boxed %2.2f%% of the particles\n",(double) accept*100.0/(accept+discard));
 }
 
-double luminosity(double time, double t_min)
+double luminosity(double time)
 {
   double temp;
-  if (time > t_min)
-    {
-      temp = I_0*pow((time)/t_min,-5./3.); 
-    }
-  else
-    {
-      temp = 0.0;
-    }
+  temp = L_0*pow((time+10.0)/TIMEINDAYS,-5./3.);
   return temp;
 }
 
 void loopthroughgrid(double ***dens, double ***velocity, double clight, double phi, double theta, char* infile)
 {
   int id;
-  double mass1,mass2,rij,baselambda,lambda,dlambda1,dlambda2,time,rij_eye,temperature1,temperature2,base_ts1,base_ts2;
+  double mass,rij,baselambda,lambda,dlambda1,dlambda2,time,rij_eye,temperature1,temperature2,base_ts1,base_ts2;
   FILE *f, *fout, *fout2;
   char line[160];
   double tpos[3],bh1pos[3],bh1v[3],bh2pos[3],bh2v[3];
   double rotate[3],rij2,time2,difflambda;
   baselambda = 656.3;
-  int time0_1,time0_2,accepted,rejected,intstarttime;
+  int time0_1,time0_2,accepted,rejected;
   int i,j,k,l,ll,freqbin;
   double ts1,ts2,strength0_1,strength0_2;
   double **spectrum,**spectrum2,tcoeff1,tcoeff2;
-  double t_min1,t_min2;
   spectrum = (double **) malloc(DURATION * sizeof(double *));
   for (i = 0; i < DURATION; i++)
     spectrum[i] = (double *) malloc(SRES * sizeof(double));
@@ -168,21 +147,9 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
   rotate[2] = cos(theta);
   //read the 2 BHs
   fgets(line,160,f);
-  sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass1,&bh1pos[0],&bh1pos[1],&bh1pos[2],&bh1v[0],&bh1v[1],&bh1v[2]);
+  sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass,&bh1pos[0],&bh1pos[1],&bh1pos[2],&bh1v[0],&bh1v[1],&bh1v[2]);
   fgets(line,160,f);
-  sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass2,&bh2pos[0],&bh2pos[1],&bh2pos[2],&bh2v[0],&bh2v[1],&bh2v[2]);
-
-  //derive the shape of the tidal flare depending on BH mass (Ulmer 1997)
-  //order of magnitude estimate in DAYS
-  t_min1 = 0.11*sqrt(mass1*MSUN_SCALE/(1.0E+06))*365.0;
-  t_min2 = 0.11*sqrt(mass2*MSUN_SCALE/(1.0E+06))*365.0;
-  //earliest time when the tidal flare leaves the BH;
-  intstarttime = floor(t_min1);
-  if (intstarttime > floor(t_min2))
-    {
-      intstarttime = floor(t_min2);
-    }
-  printf("T_min1 = %e days\nT_min2 = %e days\n",t_min1,t_min2);
+  sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass,&bh2pos[0],&bh2pos[1],&bh2pos[2],&bh2v[0],&bh2v[1],&bh2v[2]);
 
   for (i = 0; i < XRES; i++)
     for (j = 0; j < YRES; j++)
@@ -231,16 +198,12 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
 		}
 	      strength0_1 = 1.0/(rij*rij);
 	      strength0_2 = 1.0/(rij2*rij2);
-	      for (l = intstarttime; l < (intstarttime + NT); l++)
+	      for (l = 0; l < NT; l++)
 		{
 		  //now calculate the flux for NT different times
-		  //this is ergs emitted per unit time
-		  base_ts1 = strength0_1*luminosity((double) l,t_min1)*(dens[i][j][k])/PROTONMASS*HV0;//*(dens[i][j][k]);
-		  base_ts2 = strength0_2*luminosity((double) l,t_min2)*(dens[i][j][k])/PROTONMASS*HV0;
-		  //calculate the flux at some distance given in cm now all in physical units
-		  /*		  base_ts1 = base_ts1/((16*PI*PI)*DL*DL);
-		  base_ts2 = base_ts2/((16*PI*PI)*DL*DL);
-		  */
+		  base_ts1 = strength0_1*luminosity((double) l)*(dens[i][j][k]);//*(dens[i][j][k]);
+		  base_ts2 = strength0_2*ts1/strength0_1;
+
 		  //loop over whole frequency and calculate corresponding doppler broadened flux value
 		  for (ll = 0; ll < SRES; ll++)
 		    {
@@ -292,7 +255,6 @@ int main (int argc, char** argv)
   printf("1 CODE LENGTH =\t%e m = %e pc\n",M_SCALE,PC_SCALE);
   printf("1 CODE VEL =\t%e m/s\n",VSCALE);
   printf("1 CODE TIME =\t%e sec = %e days\n",TIMEINSECONDS,TIMEINDAYS);
-  printf("1 CODE Ionization rate =\t%e = %e m^2/s\n",I_0,I_0_SI);
 
   infile = (char *) malloc(100*sizeof(char));
   infileBH = (char *) malloc(100*sizeof(char));

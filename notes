@@ -1,0 +1,4 @@
+Determine Luminoisty in erg s^(-1) for a given absolute magnitude V
+
+L = 3.12e35 * 10^(-0.4*V) erg/s
+

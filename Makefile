@@ -1,10 +1,11 @@
 FLAGS= -lm -Wall -g
 CC=gcc
+CPP=g++
 
 td: main.c
-	$(CC) $^ -o td $(FLAGS)
+	$(CPP) $^ -o td $(FLAGS)
 histo: makehisto.c
-	$(CC) $^ -o makehisto $(FLAGS)
+	$(CPP) $^ -o makehisto $(FLAGS)
 all: td histo
 clean:
 	rm -rf td makehisto
