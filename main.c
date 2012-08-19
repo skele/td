@@ -6,16 +6,18 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 #include <stdio.h>
 #include <stdlib.h>
 
-#define XRES 200.0
-#define YRES 200.0
-#define ZRES 100.0
+#define PHIRES 200.0
+#define SINTHETARES 200.0
+#define RRES 100.0
 
-#define XMIN (-20.0)
-#define XMAX 20.0
-#define YMIN (-20.0)
-#define YMAX 20.0
-#define ZMIN (-10.0)
-#define ZMAX 10.0
+#define PI 3.14159
+
+#define PHIMIN (0.0)
+#define PHIMAX (2.0*PI)
+#define SINTHETAMIN (-1.0)
+#define SINTHETAMAX (1.0)
+#define RMIN (1.0)
+#define RMAX 200.0
 
 #define NT 50
 
@@ -23,8 +25,6 @@ Patrick Brem, AEI Potsdam, 07/2012 */
 #define SRES 30
 #define SMIN 655.3
 #define SMAX 657.3
-
-#define PI 3.14159
 
 #define OFFSET 20
 //additional eye distance so that all the arrival times are > 0
@@ -54,14 +54,24 @@ const double HV0 = 2.17E-11; //photon energy in erg
 
 const double DL = 3.1E+24;
 
-void fillarrays(double ***dens, double ***velocity, char* infile, double phi, double theta)
+int getsinthetaindex(double theta)
 {
-  FILE *f;
+  /* Determine an index between 0 and SINTHETARES so that sin(theta) is equally spaced wiht resolution SINTHETARES*/
+  double temp;
+  int index;
+  temp = sin(theta);
+  index = floor((temp+1.0)/2.0*SINTHETARES);
+  return index;
+}
+
+void fillarrays(double ***dens, double ***velocity, char* infile, char* bhfile, double phi, double theta)
+{
+  FILE *f,*fbh;
   int i,j,k,id,accept,discard;
   double tempx,tempy,tempz;
   char line[160];
   double tpos[3],tv[3],mass,rotate[3],volume,columndens;
-
+  double bhpos[3],bhv[3],tempr,tempphi,temptheta;
   theta = theta/180.0*3.14159;
   phi = phi/180.0*3.14159;
   rotate[0] = sin(theta)*sin(phi);
@@ -70,23 +80,35 @@ void fillarrays(double ***dens, double ***velocity, char* infile, double phi, do
   discard = 0;
   accept = 0;
   f = fopen(infile, "rt");
+  fbh = fopen(bhfile, "rt");
+  //read BHs and take first BH as center for spherical coordinates
+  fgets(line,160,fbh);
+  sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass,&bhpos[0],&bhpos[1],&bhpos[2],&bhv[0],&bhv[1],&bhv[2]);
+
   while (fgets(line, 160, f) != NULL)
     {
       sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass,&tpos[0],&tpos[1],&tpos[2],&tv[0],&tv[1],&tv[2]);
-      //convert x y and z coordinates into an integer between 0 and X/Y/Z RES
-      //first convert into a double between 0 and 1
-      tempx = (tpos[0] - XMIN)/(XMAX - XMIN);
-      tempy = (tpos[1] - YMIN)/(YMAX - YMIN);
-      tempz = (tpos[2] - ZMIN)/(ZMAX - ZMIN);
-      if ((tempx < 0.0) || (tempx >= 1.0) || (tempy < 0.0) || (tempy >= 1.0) || (tempz < 0.0) || (tempz >= 1.0)) 
+      //compute relative distance and velocity to BH
+      tempx = (tpos[0]-bhpos[0]);
+      tempy = (tpos[1]-bhpos[1]);
+      tempz = (tpos[2]-bhpos[2]);
+      //transform to spherical coordinates phi,theta,r
+      tempr = sqrt(tempx*tempx+tempy*tempy+tempz*tempz);
+      tempphi = atan2(tempy,tempx)+PI;
+      temptheta = asin(tempz/tempr);
+      //check whether r is in the range
+      if ((tempr > RMAX) || (tempr < RMIN))
 	{
 	  discard++;
 	  continue;
 	}
+      //convert it into array index
+      i = floor((tempphi/(2.0*PI))*PHIRES);
+      j = getsinthetaindex(temptheta);
+      k = floor((tempr-RMIN)/(RMAX-RMIN)*RRES);
+      printf("tempphi %f\ttemptheta %f\n",tempphi,temptheta);
+      printf("Indeces: %d\t%d\t%d\n",i,j,k);
       //convert it into the array index
-      i = floor(tempx*XRES);
-      j = floor(tempy*YRES);
-      k = floor(tempz*ZRES);
       dens[i][j][k] += mass;
       //ATTENTION: need to divide by volume later to get a real density
       //save memory: need only the line of sight component of the velocity!
@@ -95,13 +117,14 @@ void fillarrays(double ***dens, double ***velocity, char* infile, double phi, do
       accept++;
     }
   //prepare arrays for physical application
-  volume = (XMAX - XMIN)*(YMAX - YMIN)*(ZMAX - ZMIN)/(XRES*YRES*ZRES);
+  /*
+  volume = (XMAX - XMIN)*(YMAX - YMIN)*(ZMAX - ZMIN)/(PHIRES*YRES*RRES);
   printf("volume %e\n",volume);
-  for (i = 0; i < XRES; i++)
+  for (i = 0; i < PHIRES; i++)
     for (j = 0; j < YRES; j++)
       {
 	columndens = 0.0;
-      for (k = 0; k < ZRES; k++)
+      for (k = 0; k < RRES; k++)
 	{
 	  if (dens[i][j][k] > 0.0)
 	    {
@@ -112,7 +135,7 @@ void fillarrays(double ***dens, double ***velocity, char* infile, double phi, do
 	    }
 	}
       }
-  printf("Boxed %2.2f%% of the particles\n",(double) accept*100.0/(accept+discard));
+      printf("Boxed %2.2f%% of the particles\n",(double) accept*100.0/(accept+discard));*/
 }
 
 double luminosity(double time, double t_min)
@@ -167,10 +190,6 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
   rotate[1] = sin(theta)*cos(phi);
   rotate[2] = cos(theta);
   //read the 2 BHs
-  fgets(line,160,f);
-  sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass1,&bh1pos[0],&bh1pos[1],&bh1pos[2],&bh1v[0],&bh1v[1],&bh1v[2]);
-  fgets(line,160,f);
-  sscanf(line, "%d %lg %lg %lg %lg %lg %lg %lg\n",&id,&mass2,&bh2pos[0],&bh2pos[1],&bh2pos[2],&bh2v[0],&bh2v[1],&bh2v[2]);
 
   //derive the shape of the tidal flare depending on BH mass (Ulmer 1997)
   //order of magnitude estimate in DAYS
@@ -184,19 +203,20 @@ void loopthroughgrid(double ***dens, double ***velocity, double clight, double p
     }
   printf("T_min1 = %e days\nT_min2 = %e days\n",t_min1,t_min2);
 
-  for (i = 0; i < XRES; i++)
-    for (j = 0; j < YRES; j++)
-      for (k = 0; k < ZRES; k++)
+  for (i = 0; i < PHIRES; i++)
+    for (j = 0; j < SINTHETARES; j++)
+      for (k = 0; k < RRES; k++)
 	{
 	  if (dens[i][j][k] > 0.0)
 	    {
 	      //calculate 3d position of the cell, first make number between 0 and 1 then also add the half length so that it is in the center of the cell
-	      tpos[0] = i/((double) XRES)*(XMAX - XMIN) + XMIN + (XMAX-XMIN)/XRES/2.0;
+	      /*
+	      tpos[0] = i/((double) PHIRES)*(XMAX - XMIN) + XMIN + (XMAX-XMIN)/PHIRES/2.0;
 	      tpos[1] = j/((double) YRES)*(YMAX - YMIN) + YMIN + (YMAX-YMIN)/YRES/2.0;
-	      tpos[2] = k/((double) ZRES)*(ZMAX - ZMIN) + ZMIN + (ZMAX-ZMIN)/ZRES/2.0;
+	      tpos[2] = k/((double) RRES)*(ZMAX - ZMIN) + ZMIN + (ZMAX-ZMIN)/RRES/2.0;
 	      rij = sqrt((tpos[0]-bh1pos[0])*(tpos[0]-bh1pos[0])+(tpos[1]-bh1pos[1])*(tpos[1]-bh1pos[1])+(tpos[2]-bh1pos[2])*(tpos[2]-bh1pos[2]));
 	      rij2 = sqrt((tpos[0]-bh2pos[0])*(tpos[0]-bh2pos[0])+(tpos[1]-bh2pos[1])*(tpos[1]-bh2pos[1])+(tpos[2]-bh2pos[2])*(tpos[2]-bh2pos[2]));
-	      
+	      */	      
 
 
 	      //already know the l.o.s. velocity
@@ -296,25 +316,25 @@ int main (int argc, char** argv)
 
   infile = (char *) malloc(100*sizeof(char));
   infileBH = (char *) malloc(100*sizeof(char));
-  dens = (double ***) malloc(XRES*sizeof(double **));
-  for (i = 0; i < XRES; i++)
+  dens = (double ***) malloc(PHIRES*sizeof(double **));
+  for (i = 0; i < PHIRES; i++)
     {
-      dens[i] = (double **) malloc(YRES*sizeof(double*));
-      for (j = 0; j < YRES; j++)
+      dens[i] = (double **) malloc(SINTHETARES*sizeof(double*));
+      for (j = 0; j < SINTHETARES; j++)
 	{
-	  dens[i][j] = (double *) malloc (ZRES*sizeof(double));
-	  for (k = 0; k < ZRES; k++)
+	  dens[i][j] = (double *) malloc (RRES*sizeof(double));
+	  for (k = 0; k < RRES; k++)
 	    dens[i][j][k] = 0.0;
 	}
     }
-  velocity = (double ***) malloc(XRES*sizeof(double **));
-  for (i = 0; i < XRES; i++)
+  velocity = (double ***) malloc(PHIRES*sizeof(double **));
+  for (i = 0; i < PHIRES; i++)
     {
-      velocity[i] = (double **) malloc(YRES*sizeof(double*));
-      for (j = 0; j < YRES; j++)
+      velocity[i] = (double **) malloc(SINTHETARES*sizeof(double*));
+      for (j = 0; j < SINTHETARES; j++)
 	{
-	  velocity[i][j] = (double *) malloc (ZRES*sizeof(double));
-	  for (k = 0; k < ZRES; k++)
+	  velocity[i][j] = (double *) malloc (RRES*sizeof(double));
+	  for (k = 0; k < RRES; k++)
 	    velocity[i][j][k] = 0.0;
 	}
     }
@@ -323,7 +343,7 @@ int main (int argc, char** argv)
   theta = 45.0;
   infile = argv[1];
   infileBH = argv[2];
-  fillarrays(dens,velocity,infile,phi,theta);
+  fillarrays(dens,velocity,infile,infileBH,phi,theta);
   loopthroughgrid(dens,velocity,clight,phi,theta,infileBH);
 
 
