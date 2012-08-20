@@ -108,7 +108,6 @@ void fillarrays(double ***dens, double ***velocity, char* infile, char* bhfile, 
       k = floor((tempr-RMIN)/(RMAX-RMIN)*RRES);
       printf("tempphi %f\ttemptheta %f\n",tempphi,temptheta);
       printf("Indeces: %d\t%d\t%d\n",i,j,k);
-      //convert it into the array index
       dens[i][j][k] += mass;
       //ATTENTION: need to divide by volume later to get a real density
       //save memory: need only the line of sight component of the velocity!
@@ -117,11 +116,11 @@ void fillarrays(double ***dens, double ***velocity, char* infile, char* bhfile, 
       accept++;
     }
   //prepare arrays for physical application
-  /*
-  volume = (XMAX - XMIN)*(YMAX - YMIN)*(ZMAX - ZMIN)/(PHIRES*YRES*RRES);
-  printf("volume %e\n",volume);
+  
+  /* volume = (XMAX - XMIN)*(YMAX - YMIN)*(ZMAX - ZMIN)/(PHIRES*YRES*RRES); */
+  /* printf("volume %e\n",volume); */
   for (i = 0; i < PHIRES; i++)
-    for (j = 0; j < YRES; j++)
+    for (j = 0; j < SINTHETARES; j++)
       {
 	columndens = 0.0;
       for (k = 0; k < RRES; k++)
@@ -135,7 +134,7 @@ void fillarrays(double ***dens, double ***velocity, char* infile, char* bhfile, 
 	    }
 	}
       }
-      printf("Boxed %2.2f%% of the particles\n",(double) accept*100.0/(accept+discard));*/
+      printf("Boxed %2.2f%% of the particles\n",(double) accept*100.0/(accept+discard));
 }
 
 double luminosity(double time, double t_min)
